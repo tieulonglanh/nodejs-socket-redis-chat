@@ -1,0 +1,239 @@
+<html>
+<head>
+<meta charset="utf-8" >
+<script src='http://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js'></script>
+<script src='http://longnh.sdev.local/chat/date.js'></script>
+<script src="http://localhost/socket.io/socket.io.js"></script>
+<script>
+$(document).ready(function(){
+
+	// Hiển thị hộp join phòng chat
+	$('#ask').show();
+	$('#ask input').focus();
+
+	// Nhập tên join vào phòng chat bằng enter
+	$('#ask input').keydown(function(event) {
+		if (event.keyCode == 13) {
+			$('#ask a').click();
+		}
+	})
+
+	// Khi click vào nút join
+	$('#ask a').click(function() {
+		if($('#ask input').val()){
+			join($('#ask input').val());
+			$('#ask').hide();
+			$('#channel').show();
+			$('input#message').focus();
+		}else{
+			alert('Mời bạn nhập tên để vào chat');
+		}
+	});
+	// Hàm xử lý việc join và chat
+	function join(name) {
+		//var host = window.location.host.split(':')[0];
+		//var socket = io.connect('http://' + host
+
+		// Gửi thông tin join
+		if(name=="long"||name=="le"){
+			var socket = io.connect('http://localhost');
+			chatChannel = 123*234 + "_" + (123 + 234);
+			socket.emit('join', { user: name, type: 1, chatChannel: chatChannel, id1: 123, id2: 234 });
+			
+		}
+		else{
+			var socket = io.connect('http://localhost');
+			chatChannel = "chat";
+			socket.emit('join', { user: name, type: 2, chatChannel: chatChannel });
+			
+		}
+
+		var container = $('div#msgs');
+
+		// xử lý việc nhận dữ liệu trả về
+		socket.on(chatChannel , function (msg) {
+			console.log(msg);
+			var message = jQuery.parseJSON(msg);
+			var action = message.action; 
+			var struct = container.find('li.' + action + ':first'); // Tìm kiếm cấu trúc trong html
+
+			if (struct.length < 1) { // Kiểm tra cấu trúc tồn tại
+				console.log("Không thể xử lý: " + message); // Nếu không tồn tại thì báo lỗi không xử lý được
+				return;
+			}
+			
+			// Lấy ra cấu trúc template cho hiển thị thông tin chat
+			var messageView = struct.clone();
+
+			// Lấy thời gian của chat message
+			messageView.find('.time').text((new Date()).toString("HH:mm:ss"));
+
+			switch (action) {
+				case 'message': var matches;				
+								// Hiển thị thông điệp do người khác chat
+								if (matches = message.msg.match(/^\s*[\/\\]me\s(.*)/)) {
+									messageView.find('.user').text(message.user + ' ' + matches[1]);
+									messageView.find('.user').css('font-weight', 'bold');
+								// Thông điệp chat bình thường						
+								} else {
+									messageView.find('.user').text(message.user);
+									messageView.find('.message').text(': ' + htmlEntitiesDecode(message.msg));									
+								}
+								break;
+				case 'control': messageView.find('.user').text(message.user);
+								messageView.find('.message').text(htmlEntitiesDecode(message.msg));
+								messageView.addClass('control');
+								break;
+			}
+
+			// Thêm class self vào hiển thị tên người dùng
+			if (message.user == name) messageView.find('.user').addClass('self');
+
+			// Thêm vào ô nội dung
+			container.find('ul').append(messageView.show());
+			container.scrollTop(container.find('ul').innerHeight());
+		});
+
+		// Nếu message mới được gửi từ ô input chat
+		$('#channel form').submit(function(event) {
+		  event.preventDefault();
+		  var input = $(this).find(':input');
+		  var msg = input.val();
+		  if(msg){
+			socket.emit('chat', {action: 'message', user: name, msg: msg});
+		  }else{
+			alert("Mời bạn nhập nội dung");
+		  }
+		  input.val('');
+		}); 
+
+	}
+	
+	function htmlEntitiesDecode(str) {
+		return String(str).replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"');
+	}
+});
+</script>
+<style type="text/css" media="screen">
+  * {
+    font-family: Georgia;
+  }
+  a {
+    color: #000;
+    text-decoration: none;
+  }
+  a:hover {
+    text-decoration: underline;
+  }
+  div.bordered {
+    margin: 0 auto;
+    margin-top: 100px;
+    width: 600px;
+    padding: 20px;
+    text-align: center;
+    border: 10px solid #ddd;
+    -webkit-border-radius: 20px;
+  }
+  #error {
+    background-color: #BA0000;
+    color: #fff;
+    font-weight: bold;
+  }
+  #ask {
+    font-size: 20pt;
+  }
+  #ask input {
+    font-size: 20pt;
+    padding: 10px;
+    margin: 0 10px;
+  }
+  #ask span.join {
+    padding: 10px;
+    background-color: #ddd;
+    -webkit-border-radius: 10px;
+  }
+  #channel {
+    margin-top: 100px;
+    height: 480px;
+    position: relative;
+  }
+  #channel div#descr {
+    position: absolute;
+    left: -10px;
+    top: -190px;
+    font-size: 13px;
+    text-align: left;
+    line-height: 20px;
+    padding: 5px;
+    width: 630px;
+  }
+  div#msgs {
+    overflow-y: scroll;
+    height: 400px;
+  }
+  div#msgs ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    text-align: left;
+  }
+  div#msgs li {
+    line-height: 20px;
+  }
+  div#msgs li span.user {
+    color: #ff9900;
+  }
+  div#msgs li span.user.self {
+    color: #aa2211;
+  }
+  div#msgs li span.time {
+    float: right;
+    margin-right: 5px;
+    color: #aaa;
+    font-family: "Courier New";
+    font-size: 12px;
+  }
+  div#msgs li.control {
+    text-align: center;
+  }
+  div#msgs li.control span.message {
+    color: #aaa;
+  }
+  div#input {
+    text-align: left;
+    margin-top: 20px;
+  }
+  div#input #message {
+    width: 600px;
+    border: 5px solid #bbb;
+    -webkit-border-radius: 3px;
+    font-size: 30pt;
+  }
+</style>
+</head>
+<body>
+  <div id="ask" class="bordered" style="display: none;">
+    Name: <input type="text" id="name" /> <a href="#"><span class="join">Join!</span></a>
+  </div>
+  <div id="channel" class="bordered" style="display: none;">
+    <div id="descr" class="bordered">      
+      <strong>Chú ý:</strong> Anh em vào chat không được đánh nhau lộn xộn không là em làm thêm chức năng kích người ra khỏi phòng chat đấy =)).
+    </div>
+    <div id="msgs">
+      <ul>
+        <li class="message" style="display: none">
+          <span class="user"></span><span class="message"></span>
+          <span class="time"></span>
+        </li>
+        <li class="control" style="display: none">
+          <span class="user"></span>&nbsp;<span class="message"></span>
+          <span class="time"></span>
+        </li>
+      </ul>
+    </div>
+    <div id="input">
+      <form><input type="text" id="message" /></form>
+    </div>
+  </div>
+</body>
+</html>
